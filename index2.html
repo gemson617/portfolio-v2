@@ -1228,59 +1228,64 @@
     }
 
     /* ── CONTACT FORM VALIDATION & TOASTS ── */
-
-    /* Invalid field: subtle red border + soft glow, no layout shift */
-    .form-group input.invalid,
-    .form-group textarea.invalid {
-      border-color: #ef4444 !important;
-      box-shadow: 0 0 0 3px rgba(239, 68, 68, .1) !important;
-      transition: border-color .2s ease, box-shadow .2s ease;
+    .field-error {
+      display: block;
+      font-size: .72rem;
+      color: #f87171;
+      margin-top: .35rem;
+      min-height: 1em;
+      opacity: 0;
+      transform: translateY(-4px);
+      transition: opacity .2s ease, transform .2s ease;
     }
 
-    /* Success toast — bottom-right */
+    .field-error.show {
+      opacity: 1;
+      transform: none;
+    }
+
+    .form-group input.invalid,
+    .form-group textarea.invalid {
+      border-color: #f87171 !important;
+      box-shadow: 0 0 0 3px rgba(248, 113, 113, .12) !important;
+    }
+
     .ej-toast {
       position: fixed;
-      top: 1.5rem;
-      right: 1.5rem;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(12px);
       z-index: 9999;
       display: flex;
       align-items: center;
       gap: .6rem;
-      padding: .85rem 1.35rem;
+      padding: .75rem 1.4rem;
       border-radius: 12px;
-      font-size: .84rem;
+      font-size: .85rem;
       font-weight: 500;
       font-family: 'Inter', sans-serif;
       white-space: nowrap;
       pointer-events: none;
       opacity: 0;
-      transform: translateX(12px);
-      transition: opacity .22s ease, transform .22s ease;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, .4);
+      transition: opacity .25s ease, transform .25s ease;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, .45);
     }
 
     .ej-toast.show {
       opacity: 1;
-      transform: translateX(0);
+      transform: translateX(-50%) translateY(0);
     }
 
     .ej-toast.success {
       background: #0d1a0e;
-      border: 1px solid rgba(74, 222, 128, .28);
+      border: 1px solid rgba(74, 222, 128, .3);
       color: #4ade80;
     }
 
     .ej-toast.error {
       background: #1a0d0d;
-      border: 1px solid rgba(248, 113, 113, .28);
+      border: 1px solid rgba(248, 113, 113, .3);
       color: #f87171;
-    }
-
-    /* Warning toast variant for validation feedback */
-    .ej-toast.warning {
-      background: #1a1500;
-      border: 1px solid rgba(251, 191, 36, .28);
-      color: #fbbf24;
     }
 
     .btn-submit {
@@ -3223,14 +3228,17 @@
             <div class="form-group">
               <label for="cname">Your Name</label>
               <input type="text" id="cname" placeholder="Jane Smith" autocomplete="name" />
+              <span class="field-error" id="cname-error"></span>
             </div>
             <div class="form-group">
               <label for="cemail">Email Address</label>
               <input type="email" id="cemail" placeholder="jane@company.com" autocomplete="email" />
+              <span class="field-error" id="cemail-error"></span>
             </div>
             <div class="form-group">
               <label for="cmsg">Message</label>
               <textarea id="cmsg" placeholder="Tell me about your project…"></textarea>
+              <span class="field-error" id="cmsg-error"></span>
             </div>
             <button type="submit" class="btn-submit" id="contactSubmit">Send Message →</button>
           </form>
@@ -3242,7 +3250,6 @@
   <!-- EmailJS Toast Notifications -->
   <div class="ej-toast success" id="ejToastSuccess">✓ Message sent successfully!</div>
   <div class="ej-toast error" id="ejToastError">✕ Failed to send. Please try again.</div>
-  <div class="ej-toast warning" id="ejToastWarn"></div>
 
   <!-- FOOTER -->
   <footer>
@@ -3908,101 +3915,72 @@
     // ══ EMAILJS CONTACT FORM ══
     (function () {
 
-      // ── Config ───────────────────────────────────────────────────
-      var SERVICE_ID = 'service_vdrmflu';
-      var TEMPLATE_ID = 'template_rmros4m';
+      // ── Config — update TEMPLATE_ID to your EmailJS template ID ──
+      const SERVICE_ID = 'service_vdrmflu';
+      const TEMPLATE_ID = 'template_rmros4m';
 
       // ── DOM references ────────────────────────────────────────────
-      var form = document.getElementById('contactForm');
-      var nameEl = document.getElementById('cname');
-      var emailEl = document.getElementById('cemail');
-      var msgEl = document.getElementById('cmsg');
-      var submitBtn = document.getElementById('contactSubmit');
-      var toastOk = document.getElementById('ejToastSuccess');
-      var toastErr = document.getElementById('ejToastError');
+      const form = document.getElementById('contactForm');
+      const nameEl = document.getElementById('cname');
+      const emailEl = document.getElementById('cemail');
+      const msgEl = document.getElementById('cmsg');
+      const submitBtn = document.getElementById('contactSubmit');
+      const toastOk = document.getElementById('ejToastSuccess');
+      const toastErr = document.getElementById('ejToastError');
 
-      if (!form) return;
+      if (!form) return; // guard — exits if form not found
 
-      // ── Toast helper: slide in from right, auto-dismiss ──────────
-      var toastTimer = null;
+      // ── Toast: show for `ms` milliseconds ───────────────────────
       function showToast(el, ms) {
-        // Clear any existing toast first (prevents stacking)
-        [toastOk, toastErr, toastWarn].forEach(function (t) {
-          if (t) t.classList.remove('show');
-        });
-        clearTimeout(toastTimer);
         ms = ms || 3500;
         el.classList.add('show');
-        toastTimer = setTimeout(function () { el.classList.remove('show'); }, ms);
+        setTimeout(function () { el.classList.remove('show'); }, ms);
       }
 
-      // Warning toast (validation feedback) — created once, reused
-      var toastWarn = document.getElementById('ejToastWarn');
-
-      // ── Mark a field invalid (red border + glow only) ────────────
-      function markInvalid(input) {
+      // ── Attach error text + red border to a field ────────────────
+      function setError(input, errorId, msg) {
+        var errEl = document.getElementById(errorId);
         input.classList.add('invalid');
+        if (errEl) { errEl.textContent = msg; errEl.classList.add('show'); }
       }
 
-      // ── Clear invalid state from a field ────────────────────────
-      function markValid(input) {
+      // ── Clear error from a field ─────────────────────────────────
+      function clearError(input, errorId) {
+        var errEl = document.getElementById(errorId);
         input.classList.remove('invalid');
+        if (errEl) { errEl.textContent = ''; errEl.classList.remove('show'); }
       }
 
-      // ── Email format check ────────────────────────────────────────
+      // ── Live clear: remove error as soon as user starts typing ───
+      [[nameEl, 'cname-error'], [emailEl, 'cemail-error'], [msgEl, 'cmsg-error']]
+        .forEach(function (pair) {
+          if (!pair[0]) return;
+          pair[0].addEventListener('input', function () { clearError(pair[0], pair[1]); });
+        });
+
+      // ── Simple email format check ────────────────────────────────
       function isValidEmail(val) {
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
       }
 
-      // ── Live validation on input — remove error when field becomes valid ──
-      nameEl.addEventListener('input', function () {
-        if (nameEl.value.trim()) markValid(nameEl);
-      });
-      emailEl.addEventListener('input', function () {
-        var v = emailEl.value.trim();
-        if (v && isValidEmail(v)) markValid(emailEl);
-      });
-      msgEl.addEventListener('input', function () {
-        if (msgEl.value.trim()) markValid(msgEl);
-      });
-
-      // ── Validate all fields ───────────────────────────────────────
-      // Returns: { ok: bool, emailInvalid: bool, firstInvalid: el|null }
+      // ── Validate all fields; returns true only if all pass ───────
       function validate(name, email, message) {
         var ok = true;
-        var emailInvalid = false;
-        var firstInvalid = null;
-
-        // Clear all previous states first
-        [nameEl, emailEl, msgEl].forEach(markValid);
-
         if (!name) {
-          markInvalid(nameEl);
-          firstInvalid = firstInvalid || nameEl;
-          ok = false;
+          setError(nameEl, 'cname-error', 'Name is required.'); ok = false;
         }
-
         if (!email) {
-          markInvalid(emailEl);
-          firstInvalid = firstInvalid || emailEl;
-          ok = false;
+          setError(emailEl, 'cemail-error', 'Email is required.'); ok = false;
         } else if (!isValidEmail(email)) {
-          markInvalid(emailEl);
-          firstInvalid = firstInvalid || emailEl;
-          emailInvalid = true;
-          ok = false;
+          setError(emailEl, 'cemail-error', 'Enter a valid email address.'); ok = false;
         }
-
         if (!message) {
-          markInvalid(msgEl);
-          firstInvalid = firstInvalid || msgEl;
-          ok = false;
+          setError(msgEl, 'cmsg-error', 'Message is required.'); ok = false;
         }
-
-        return { ok: ok, emailInvalid: emailInvalid, firstInvalid: firstInvalid };
+        return ok;
       }
 
-      // ── Form submit ───────────────────────────────────────────────
+      // ── Form submit ──────────────────────────────────────────────
       form.addEventListener('submit', function (e) {
         e.preventDefault();
 
@@ -4010,25 +3988,8 @@
         var email = emailEl.value.trim();
         var message = msgEl.value.trim();
 
-        var result = validate(name, email, message);
-
-        if (!result.ok) {
-          // Focus first invalid field for accessibility
-          if (result.firstInvalid) result.firstInvalid.focus();
-
-          // ONE global toast — different message for email format error
-          if (result.emailInvalid && name && message) {
-            showToast(toastWarn);
-            toastWarn.textContent = '✕ Please enter a valid email address.';
-          } else {
-            showToast(toastWarn);
-            toastWarn.textContent = '✕ Please fill in all required fields.';
-          }
-          return;
-        }
-
-        // All valid — clear any remaining borders
-        [nameEl, emailEl, msgEl].forEach(markValid);
+        // Abort if validation fails
+        if (!validate(name, email, message)) return;
 
         // Sending state
         submitBtn.disabled = true;
