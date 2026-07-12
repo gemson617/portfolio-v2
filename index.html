@@ -1169,6 +1169,10 @@
       letter-spacing: .5px;
       text-transform: uppercase;
       color: var(--muted);
+      margin-bottom: .2rem;
+    }
+
+    #contactForm .contact-field {
       margin-bottom: .4rem;
     }
 
@@ -3220,15 +3224,15 @@
         </div>
         <div class="contact-form reveal reveal-d2">
           <form id="contactForm" novalidate>
-            <div class="form-group">
+            <div class="form-group contact-field">
               <label for="cname">Your Name</label>
               <input type="text" id="cname" placeholder="Jane Smith" autocomplete="name" />
             </div>
-            <div class="form-group">
+            <div class="form-group contact-field">
               <label for="cemail">Email Address</label>
               <input type="email" id="cemail" placeholder="jane@company.com" autocomplete="email" />
             </div>
-            <div class="form-group">
+            <div class="form-group contact-field">
               <label for="cmsg">Message</label>
               <textarea id="cmsg" placeholder="Tell me about your project…"></textarea>
             </div>
