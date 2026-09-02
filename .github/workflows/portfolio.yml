@@ -6,6 +6,7 @@ on:
       - main
 
 jobs:
+
   test:
     runs-on: ubuntu-latest
 
@@ -13,11 +14,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Show project files
-        run: ls -la
-
       - name: Check index.html
         run: test -f index.html
 
-      - name: CI completed
-        run: echo "Portfolio CI completed successfully!"
+      - name: Test completed
+        run: echo "Testing completed successfully!"
+
+  information:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Show runner information
+        run: |
+          echo "Hello from GitHub Actions!"
+          echo "This is another job."
+          echo "The runner is:"
+          uname -a
