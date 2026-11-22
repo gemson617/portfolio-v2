@@ -20,26 +20,46 @@ jobs:
           test -d assets
           echo "Portfolio validation passed!"
 
+      
       - name: Configure SSH
         env:
           SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
           EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_HOST_FINGERPRINT: ${{ secrets.EC2_HOST_FINGERPRINT }}
         run: |
+          set -e
+
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
           printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
 
-          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts
+          ssh-keyscan -t ed25519 -H "$EC2_HOST" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Test EC2 SSH connection
+          ACTUAL_FINGERPRINT=$(ssh-keygen -lf ~/.ssh/known_hosts -E sha256 | awk '{print $2}')
+
+          if [ "$ACTUAL_FINGERPRINT" != "$EC2_HOST_FINGERPRINT" ]; then
+            echo "ERROR: EC2 SSH host fingerprint mismatch!"
+            exit 1
+          fi
+
+          echo "EC2 SSH host identity verified!"
+
+
+      - name: Deploy portfolio to EC2
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
           EC2_USER: ${{ secrets.EC2_USER }}
         run: |
           ssh -o BatchMode=yes \
             -o StrictHostKeyChecking=yes \
-            "$EC2_USER@$EC2_HOST" \
-            'echo "SSH connection successful!" && whoami'
+            "$EC2_USER@$EC2_HOST" << 'EOF'
+              set -e
+              cd /var/www/portfolio-v2
+              git pull --ff-only origin main
+              echo "Portfolio deployed successfully!"
+          EOF
+
+    
